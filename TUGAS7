@@ -1,0 +1,174 @@
+-- Membuat Database
+CREATE DATABASE NutrisiKu;
+USE NutrisiKu;
+
+-- Membuat Tabel Anggota
+CREATE TABLE anggota (
+    id_anggota INT PRIMARY KEY AUTO_INCREMENT,
+    nama_lengkap VARCHAR(50),
+    tanggal_lahir DATE,
+    jenis_kelamin ENUM('Pria', 'Wanita', 'Lainnya'),
+    tinggi_badan INT,
+    berat_badan DECIMAL(5,2),
+    email VARCHAR(100) UNIQUE
+);
+
+-- Membuat Tabel Kategori_Makanan
+CREATE TABLE kategori_makanan (
+    id_kategori INT PRIMARY KEY AUTO_INCREMENT,
+    nama_kategori VARCHAR(50),
+    deskripsi TEXT
+);
+
+-- Membuat Tabel Makanan
+CREATE TABLE makanan (
+    id_makanan INT AUTO_INCREMENT PRIMARY KEY,
+    nama_makanan VARCHAR(50),
+    id_kategori INT,
+    kalori INT,
+    protein DECIMAL(5,2),
+    karbohidrat DECIMAL(5,2),
+    lemak DECIMAL(5,2),
+    FOREIGN KEY (id_kategori) REFERENCES kategori_makanan(id_kategori)
+);
+
+-- Membuat Tabel Jurnal_Makan
+CREATE TABLE jurnal_makan (
+    id_jurnal INT PRIMARY KEY AUTO_INCREMENT,
+    id_anggota INT,
+    id_makanan INT,
+    tanggal_waktu DATETIME,
+    porsi INT,
+    catatan TEXT,
+    FOREIGN KEY (id_anggota) REFERENCES anggota(id_anggota),
+    FOREIGN KEY (id_makanan) REFERENCES makanan(id_makanan)
+);
+
+-- Membuat Tabel Target_Nutrisi
+CREATE TABLE target_nutrisi (
+    id_target INT AUTO_INCREMENT PRIMARY KEY,
+    id_anggota INT,
+    kalori_harian INT,
+    protein_harian DECIMAL(5,2),
+    karbohidrat_harian DECIMAL(5,2),
+    lemak_harian DECIMAL(5,2),
+    tanggal_mulai DATE,
+    tanggal_selesai DATE,
+    FOREIGN KEY (id_anggota) REFERENCES anggota(id_anggota)
+);
+
+-- Membuat Prosedur
+DELIMITER //
+
+-- Prosedur Daftar Anggota Baru
+CREATE PROCEDURE DaftarAnggotaBaru (
+    IN p_nama_lengkap VARCHAR(50),
+    IN p_tanggal_lahir DATE,
+    IN p_jenis_kelamin ENUM('Pria', 'Wanita', 'Lainnya'),
+    IN p_tinggi_badan INT,
+    IN p_berat_badan DECIMAL(5,2),
+    IN p_email VARCHAR(100)
+)
+BEGIN
+    INSERT INTO anggota (nama_lengkap, tanggal_lahir, jenis_kelamin, tinggi_badan, berat_badan, email)
+    VALUES (p_nama_lengkap, p_tanggal_lahir, p_jenis_kelamin, p_tinggi_badan, p_berat_badan, p_email);
+END //
+
+-- Prosedur Tambah Makanan Baru
+CREATE PROCEDURE TambahMakananBaru (
+    IN p_nama_makanan VARCHAR(50),
+    IN p_id_kategori INT,
+    IN p_kalori INT,
+    IN p_protein DECIMAL(5,2),
+    IN p_karbohidrat DECIMAL(5,2),
+    IN p_lemak DECIMAL(5,2)
+)
+BEGIN
+    INSERT INTO makanan (nama_makanan, id_kategori, kalori, protein, karbohidrat, lemak)
+    VALUES (p_nama_makanan, p_id_kategori, p_kalori, p_protein, p_karbohidrat, p_lemak);
+END //
+
+-- Prosedur Catat Jurnal Makan
+CREATE PROCEDURE CatatJurnalMakan (
+    IN p_id_anggota INT,
+    IN p_id_makanan INT,
+    IN p_tanggal_waktu DATETIME,
+    IN p_porsi INT,
+    IN p_catatan TEXT
+)
+BEGIN
+    INSERT INTO jurnal_makan (id_anggota, id_makanan, tanggal_waktu, porsi, catatan)
+    VALUES (p_id_anggota, p_id_makanan, p_tanggal_waktu, p_porsi, p_catatan);
+END //
+
+-- Prosedur Atur Target Nutrisi
+CREATE PROCEDURE AturTargetNutrisi (
+    IN p_id_anggota INT,
+    IN p_kalori_harian INT,
+    IN p_protein_harian DECIMAL(5,2),
+    IN p_karbohidrat_harian DECIMAL(5,2),
+    IN p_lemak_harian DECIMAL(5,2),
+    IN p_tanggal_mulai DATE,
+    IN p_tanggal_selesai DATE
+)
+BEGIN
+    INSERT INTO target_nutrisi (id_anggota, kalori_harian, protein_harian, karbohidrat_harian, lemak_harian, tanggal_mulai, tanggal_selesai)
+    VALUES (p_id_anggota, p_kalori_harian, p_protein_harian, p_karbohidrat_harian, p_lemak_harian, p_tanggal_mulai, p_tanggal_selesai);
+END //
+
+-- Prosedur Hitung BMI
+CREATE PROCEDURE HitungBMI (
+    IN p_id_anggota INT,
+    OUT p_bmi DECIMAL(5,2)
+)
+BEGIN
+    DECLARE v_tinggi_m DECIMAL(5,2);
+    DECLARE v_berat DECIMAL(5,2);
+    
+    SELECT tinggi_badan / 100, berat_badan INTO v_tinggi_m, v_berat
+    FROM anggota
+    WHERE id_anggota = p_id_anggota;
+    
+    SET p_bmi = v_berat / (v_tinggi_m * v_tinggi_m);
+END //
+
+DELIMITER ;
+
+-- Contoh Penggunaan Prosedur
+CALL DaftarAnggotaBaru('Siti Nurhayati', '1990-05-15', 'Wanita', 165, 55.5, 'siti@email.com');
+CALL TambahMakananBaru('Gado-gado', 1, 300, 10.5, 30.2, 15.7);
+CALL CatatJurnalMakan(1, 1, '2024-10-17 12:30:00', 1, 'Makan siang di kantin');
+CALL AturTargetNutrisi(1, 2000, 75.0, 250.0, 65.0, '2024-10-01', '2024-10-31');
+
+-- Membuat View
+CREATE VIEW RingkasanNutrisiHarian AS
+SELECT
+    a.nama_lengkap,
+    jm.tanggal_waktu,
+    SUM(m.kalori * jm.porsi) AS total_kalori,
+    SUM(m.protein * jm.porsi) AS total_protein,
+    SUM(m.karbohidrat * jm.porsi) AS total_karbohidrat,
+    SUM(m.lemak * jm.porsi) AS total_lemak
+FROM
+    jurnal_makan jm
+JOIN
+    anggota a ON jm.id_anggota = a.id_anggota
+JOIN
+    makanan m ON jm.id_makanan = m.id_makanan
+GROUP BY
+    a.id_anggota, DATE(jm.tanggal_waktu);
+
+-- Contoh Trigger
+DELIMITER //
+CREATE TRIGGER before_insert_jurnal_makan
+BEFORE INSERT ON jurnal_makan
+FOR EACH ROW
+BEGIN
+    DECLARE makanan_kalori INT;
+    SELECT kalori INTO makanan_kalori FROM makanan WHERE id_makanan = NEW.id_makanan;
+    IF (makanan_kalori * NEW.porsi) > 1000 THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Peringatan: Konsumsi kalori melebihi 1000 kalori dalam satu entri!';
+    END IF;
+END //
+DELIMITER ;
